@@ -1,0 +1,15 @@
+import turtle as t
+import random
+tim=t.Turtle()
+
+c1 =["blue","chartreuse","gold","red","olive drab"]
+
+def draw_shape(num_side):
+    for _ in range(num_side):
+        angle = 360/num_side
+        tim.forward(100)
+        tim.right(angle)
+
+for shape_side_n in range(3,11):
+    tim.color(random.choice(c1))
+    draw_shape(shape_side_n)
