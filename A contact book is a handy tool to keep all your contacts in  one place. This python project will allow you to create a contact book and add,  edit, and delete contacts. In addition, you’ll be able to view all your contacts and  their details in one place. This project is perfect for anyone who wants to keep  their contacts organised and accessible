@@ -1,0 +1,398 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import json
+import os
+import re
+
+# ─────────────────────────────────────────────
+#  Data layer
+# ─────────────────────────────────────────────
+DATA_FILE = os.path.join(os.path.dirname(__file__), "contacts_data.json")
+
+def load_contacts():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_contacts(contacts):
+    with open(DATA_FILE, "w") as f:
+        json.dump(contacts, f, indent=2)
+
+# ─────────────────────────────────────────────
+#  Helpers
+# ─────────────────────────────────────────────
+def valid_phone(phone):
+    return bool(re.match(r"^[+]?[\d\s\-().]{7,20}$", phone))
+
+def valid_email(email):
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email)) or email == ""
+
+# ─────────────────────────────────────────────
+#  Palette & fonts
+# ─────────────────────────────────────────────
+BG       = "#0f0e17"
+SURFACE  = "#1a1829"
+CARD     = "#221f35"
+ACCENT   = "#e8c547"
+ACCENT2  = "#ff6b6b"
+FG       = "#fffffe"
+FG_MUTED = "#a7a9be"
+BORDER   = "#2e2b47"
+
+FONT_HEAD  = ("Georgia", 22, "bold")
+FONT_TITLE = ("Georgia", 13, "bold")
+FONT_BODY  = ("Courier", 11)
+FONT_LABEL = ("Courier", 10)
+FONT_BTN   = ("Georgia", 10, "bold")
+FONT_SMALL = ("Courier", 9)
+
+# ─────────────────────────────────────────────
+#  Main Application
+# ─────────────────────────────────────────────
+class ContactBook(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("◈ Contact Book")
+        self.geometry("1040x680")
+        self.minsize(860, 580)
+        self.configure(bg=BG)
+
+        self.contacts = load_contacts()
+        self.selected_idx = None   # index in self.contacts
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self.refresh_list())
+
+        self._build_ui()
+        self.refresh_list()
+
+    # ── UI Construction ───────────────────────
+    def _build_ui(self):
+        # ── Header bar
+        hdr = tk.Frame(self, bg=BG, pady=14)
+        hdr.pack(fill="x", padx=30)
+
+        tk.Label(hdr, text="◈", font=("Georgia", 28, "bold"),
+                 fg=ACCENT, bg=BG).pack(side="left")
+        tk.Label(hdr, text=" Contact Book", font=FONT_HEAD,
+                 fg=FG, bg=BG).pack(side="left")
+
+        # Search bar on the right of header
+        search_frame = tk.Frame(hdr, bg=SURFACE, bd=0,
+                                highlightbackground=BORDER, highlightthickness=1)
+        search_frame.pack(side="right", padx=(0, 4), ipady=4, ipadx=6)
+        tk.Label(search_frame, text="⌕", font=("Courier", 13),
+                 fg=FG_MUTED, bg=SURFACE).pack(side="left", padx=(6, 0))
+        tk.Entry(search_frame, textvariable=self.search_var,
+                 font=FONT_BODY, bg=SURFACE, fg=FG,
+                 insertbackground=ACCENT, bd=0, width=22,
+                 highlightthickness=0).pack(side="left", padx=6)
+
+        sep = tk.Frame(self, bg=BORDER, height=1)
+        sep.pack(fill="x", padx=30)
+
+        # ── Main pane
+        main = tk.Frame(self, bg=BG)
+        main.pack(fill="both", expand=True, padx=30, pady=20)
+        main.columnconfigure(0, weight=3)
+        main.columnconfigure(1, weight=0)
+        main.columnconfigure(2, weight=5)
+        main.rowconfigure(0, weight=1)
+
+        # Left: contact list
+        self._build_list_panel(main)
+
+        # Divider
+        tk.Frame(main, bg=BORDER, width=1).grid(row=0, column=1, sticky="ns", padx=14)
+
+        # Right: detail/edit panel
+        self._build_detail_panel(main)
+
+    def _build_list_panel(self, parent):
+        panel = tk.Frame(parent, bg=BG)
+        panel.grid(row=0, column=0, sticky="nsew")
+        panel.rowconfigure(1, weight=1)
+        panel.columnconfigure(0, weight=1)
+
+        # Toolbar
+        toolbar = tk.Frame(panel, bg=BG, pady=2)
+        toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+
+        self._btn(toolbar, "＋ New", self.new_contact,
+                  bg=ACCENT, fg=BG).pack(side="left")
+        self._btn(toolbar, "✎ Edit", self.edit_contact,
+                  bg=SURFACE).pack(side="left", padx=8)
+        self._btn(toolbar, "⌫ Delete", self.delete_contact,
+                  bg=SURFACE, fg=ACCENT2).pack(side="left")
+
+        # Listbox with scrollbar
+        list_frame = tk.Frame(panel, bg=CARD,
+                              highlightbackground=BORDER, highlightthickness=1)
+        list_frame.grid(row=1, column=0, sticky="nsew")
+
+        scrollbar = tk.Scrollbar(list_frame, bg=SURFACE,
+                                 troughcolor=SURFACE, bd=0)
+        scrollbar.pack(side="right", fill="y")
+
+        self.listbox = tk.Listbox(
+            list_frame,
+            bg=CARD, fg=FG, selectbackground=ACCENT,
+            selectforeground=BG, font=FONT_BODY, bd=0,
+            highlightthickness=0, activestyle="none",
+            yscrollcommand=scrollbar.set,
+            cursor="hand2"
+        )
+        self.listbox.pack(fill="both", expand=True, padx=0)
+        scrollbar.config(command=self.listbox.yview)
+        self.listbox.bind("<<ListboxSelect>>", self.on_select)
+        self.listbox.bind("<Double-Button-1>", lambda e: self.edit_contact())
+
+        # Count label
+        self.count_label = tk.Label(panel, text="", font=FONT_SMALL,
+                                    fg=FG_MUTED, bg=BG, anchor="w")
+        self.count_label.grid(row=2, column=0, sticky="ew", pady=(6, 0))
+
+    def _build_detail_panel(self, parent):
+        self.detail_outer = tk.Frame(parent, bg=BG)
+        self.detail_outer.grid(row=0, column=2, sticky="nsew")
+        self.detail_outer.rowconfigure(0, weight=1)
+        self.detail_outer.columnconfigure(0, weight=1)
+
+        # ── View card
+        self.view_frame = tk.Frame(self.detail_outer, bg=CARD,
+                                   highlightbackground=BORDER,
+                                   highlightthickness=1)
+        self.view_frame.grid(row=0, column=0, sticky="nsew")
+
+        self.lbl_avatar = tk.Label(self.view_frame, text="",
+                                   font=("Georgia", 52, "bold"),
+                                   fg=ACCENT, bg=CARD)
+        self.lbl_avatar.pack(pady=(36, 0))
+
+        self.lbl_name_big = tk.Label(self.view_frame, text="Select a contact",
+                                     font=("Georgia", 18, "bold"),
+                                     fg=FG, bg=CARD)
+        self.lbl_name_big.pack()
+
+        self.lbl_group = tk.Label(self.view_frame, text="",
+                                  font=FONT_SMALL, fg=ACCENT, bg=CARD)
+        self.lbl_group.pack(pady=(2, 20))
+
+        info_frame = tk.Frame(self.view_frame, bg=CARD)
+        info_frame.pack(fill="x", padx=40)
+
+        self.detail_rows = {}
+        for field, icon in [("phone", "📞"), ("email", "✉"),
+                             ("address", "📍"), ("notes", "📝")]:
+            row = tk.Frame(info_frame, bg=CARD, pady=6)
+            row.pack(fill="x")
+            tk.Label(row, text=icon, font=("Courier", 12),
+                     bg=CARD, width=3, anchor="w").pack(side="left")
+            lbl = tk.Label(row, text="—", font=FONT_BODY,
+                           fg=FG_MUTED, bg=CARD, anchor="w",
+                           wraplength=340, justify="left")
+            lbl.pack(side="left", fill="x", expand=True)
+            self.detail_rows[field] = lbl
+
+        # ── Edit / New card
+        self.edit_frame = tk.Frame(self.detail_outer, bg=CARD,
+                                   highlightbackground=BORDER,
+                                   highlightthickness=1)
+
+        edit_title_frame = tk.Frame(self.edit_frame, bg=CARD)
+        edit_title_frame.pack(fill="x", padx=24, pady=(22, 6))
+        self.edit_title_lbl = tk.Label(edit_title_frame, text="New Contact",
+                                       font=FONT_TITLE, fg=ACCENT, bg=CARD)
+        self.edit_title_lbl.pack(side="left")
+
+        fields_frame = tk.Frame(self.edit_frame, bg=CARD)
+        fields_frame.pack(fill="both", expand=True, padx=24, pady=4)
+        fields_frame.columnconfigure(1, weight=1)
+
+        self.edit_vars = {}
+        field_defs = [
+            ("name",    "Full Name *", False),
+            ("phone",   "Phone *",     False),
+            ("email",   "Email",       False),
+            ("group",   "Group",       False),
+            ("address", "Address",     False),
+            ("notes",   "Notes",       True),
+        ]
+        for r, (key, label, multiline) in enumerate(field_defs):
+            tk.Label(fields_frame, text=label, font=FONT_LABEL,
+                     fg=FG_MUTED, bg=CARD, anchor="w"
+                     ).grid(row=r, column=0, sticky="nw", padx=(0, 12), pady=6)
+            if multiline:
+                widget = tk.Text(fields_frame, font=FONT_BODY, bg=SURFACE,
+                                 fg=FG, insertbackground=ACCENT, bd=0,
+                                 highlightbackground=BORDER,
+                                 highlightthickness=1, height=3, width=28,
+                                 wrap="word")
+                widget.grid(row=r, column=1, sticky="ew", pady=6)
+                self.edit_vars[key] = widget
+            else:
+                var = tk.StringVar()
+                ent = tk.Entry(fields_frame, textvariable=var, font=FONT_BODY,
+                               bg=SURFACE, fg=FG, insertbackground=ACCENT,
+                               bd=0, highlightbackground=BORDER,
+                               highlightthickness=1)
+                ent.grid(row=r, column=1, sticky="ew", pady=6, ipady=5, ipadx=6)
+                self.edit_vars[key] = var
+
+        btn_row = tk.Frame(self.edit_frame, bg=CARD)
+        btn_row.pack(fill="x", padx=24, pady=16)
+        self._btn(btn_row, "✔ Save", self.save_contact,
+                  bg=ACCENT, fg=BG).pack(side="left")
+        self._btn(btn_row, "✖ Cancel", self.cancel_edit,
+                  bg=SURFACE).pack(side="left", padx=10)
+
+    # ── Buttons helper ────────────────────────
+    def _btn(self, parent, text, cmd, bg=SURFACE, fg=FG):
+        b = tk.Button(parent, text=text, command=cmd, font=FONT_BTN,
+                      bg=bg, fg=fg, activebackground=ACCENT,
+                      activeforeground=BG, bd=0, padx=14, pady=7,
+                      cursor="hand2", relief="flat")
+        b.bind("<Enter>", lambda e, w=b: w.configure(bg=ACCENT, fg=BG))
+        b.bind("<Leave>", lambda e, w=b, _bg=bg, _fg=fg:
+               w.configure(bg=_bg, fg=_fg))
+        return b
+
+    # ── List management ───────────────────────
+    def filtered_contacts(self):
+        q = self.search_var.get().lower()
+        if not q:
+            return list(enumerate(self.contacts))
+        return [(i, c) for i, c in enumerate(self.contacts)
+                if q in c.get("name", "").lower()
+                or q in c.get("phone", "").lower()
+                or q in c.get("email", "").lower()
+                or q in c.get("group", "").lower()]
+
+    def refresh_list(self):
+        self.listbox.delete(0, "end")
+        self._filtered = self.filtered_contacts()
+        self._filtered.sort(key=lambda x: x[1].get("name", "").lower())
+        for _, c in self._filtered:
+            name = c.get("name", "—")
+            group = c.get("group", "")
+            tag = f"  [{group}]" if group else ""
+            self.listbox.insert("end", f"  {name}{tag}")
+        n = len(self._filtered)
+        total = len(self.contacts)
+        self.count_label.config(
+            text=f"{n} contact{'s' if n != 1 else ''}" +
+                 (f" (of {total})" if n != total else ""))
+
+    def on_select(self, event=None):
+        sel = self.listbox.curselection()
+        if not sel:
+            return
+        idx_in_filtered = sel[0]
+        self.selected_idx, contact = self._filtered[idx_in_filtered]
+        self._show_detail(contact)
+        self._show_view()
+
+    def _show_detail(self, c):
+        name = c.get("name", "?")
+        self.lbl_avatar.config(text=name[0].upper())
+        self.lbl_name_big.config(text=name)
+        self.lbl_group.config(text=c.get("group", "").upper())
+        for field in ("phone", "email", "address", "notes"):
+            val = c.get(field, "") or "—"
+            self.detail_rows[field].config(text=val)
+
+    def _show_view(self):
+        self.edit_frame.grid_remove()
+        self.view_frame.grid(row=0, column=0, sticky="nsew")
+
+    def _show_edit(self):
+        self.view_frame.grid_remove()
+        self.edit_frame.grid(row=0, column=0, sticky="nsew")
+
+    # ── CRUD ──────────────────────────────────
+    def new_contact(self):
+        self.selected_idx = None
+        self.edit_title_lbl.config(text="✦ New Contact")
+        for key, widget in self.edit_vars.items():
+            if isinstance(widget, tk.Text):
+                widget.delete("1.0", "end")
+            else:
+                widget.set("")
+        self._show_edit()
+
+    def edit_contact(self):
+        if self.selected_idx is None:
+            messagebox.showinfo("No selection", "Please select a contact first.")
+            return
+        c = self.contacts[self.selected_idx]
+        self.edit_title_lbl.config(text="✎ Edit Contact")
+        for key, widget in self.edit_vars.items():
+            val = c.get(key, "")
+            if isinstance(widget, tk.Text):
+                widget.delete("1.0", "end")
+                widget.insert("1.0", val)
+            else:
+                widget.set(val)
+        self._show_edit()
+
+    def save_contact(self):
+        data = {}
+        for key, widget in self.edit_vars.items():
+            if isinstance(widget, tk.Text):
+                data[key] = widget.get("1.0", "end").strip()
+            else:
+                data[key] = widget.get().strip()
+
+        if not data["name"]:
+            messagebox.showerror("Validation", "Name is required.")
+            return
+        if not data["phone"]:
+            messagebox.showerror("Validation", "Phone number is required.")
+            return
+        if not valid_phone(data["phone"]):
+            messagebox.showerror("Validation",
+                                 "Phone number contains invalid characters.")
+            return
+        if not valid_email(data["email"]):
+            messagebox.showerror("Validation",
+                                 "Please enter a valid email address.")
+            return
+
+        if self.selected_idx is None:
+            self.contacts.append(data)
+            self.selected_idx = len(self.contacts) - 1
+        else:
+            self.contacts[self.selected_idx] = data
+
+        save_contacts(self.contacts)
+        self.refresh_list()
+        self._show_detail(data)
+        self._show_view()
+
+    def delete_contact(self):
+        if self.selected_idx is None:
+            messagebox.showinfo("No selection", "Please select a contact first.")
+            return
+        name = self.contacts[self.selected_idx].get("name", "this contact")
+        if messagebox.askyesno("Delete", f"Delete '{name}'? This cannot be undone."):
+            self.contacts.pop(self.selected_idx)
+            save_contacts(self.contacts)
+            self.selected_idx = None
+            self.lbl_avatar.config(text="")
+            self.lbl_name_big.config(text="Select a contact")
+            self.lbl_group.config(text="")
+            for lbl in self.detail_rows.values():
+                lbl.config(text="—")
+            self._show_view()
+            self.refresh_list()
+
+    def cancel_edit(self):
+        self._show_view()
+
+
+# ─────────────────────────────────────────────
+#  Entry point
+# ─────────────────────────────────────────────
+if __name__ == "__main__":
+    app = ContactBook()
+    app.mainloop()
