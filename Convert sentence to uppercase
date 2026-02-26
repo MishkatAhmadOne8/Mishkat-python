@@ -1,0 +1,4 @@
+# Practical 6 - Lab Assignment 2
+
+sentence = input("Enter a sentence: ")
+print("Output:", sentence.upper())
