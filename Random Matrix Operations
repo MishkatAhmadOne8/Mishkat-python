@@ -1,0 +1,15 @@
+import numpy as np
+
+# Generate two 3x3 matrices with random integers from 1 to 9
+matrix_a = np.random.randint(1, 10, size=(3, 3))
+matrix_b = np.random.randint(1, 10, size=(3, 3))
+
+print("Matrix A:\n", matrix_a)
+print("Matrix B:\n", matrix_b)
+
+# Perform matrix addition
+addition = matrix_a + matrix_b
+print("\nMatrix Addition (A + B):\n", addition)
+
+# Perform matrix multiplication
+multiplication = np.dot(matrix_a, matrix_b)
