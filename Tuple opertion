@@ -1,0 +1,25 @@
+# Practical 5 - Lab Assignment 1
+
+numbers = tuple(map(int, input("Enter integers separated by space: ").split()))
+
+# a) Print total number of items
+print("Total items:", len(numbers))
+
+# b) Print last item
+print("Last item:", numbers[-1])
+
+# c) Print elements in reverse order
+print("Reverse order:", numbers[::-1])
+
+# d) Check if 5 is present
+if 5 in numbers:
+    print("Yes, 5 is present")
+else:
+    print("No, 5 is not present")
+
+# e) Remove first and last items, sort remaining and print
+if len(numbers) > 2:
+    new_tuple = tuple(sorted(numbers[1:-1]))
+    print("After removing first & last and sorting:", new_tuple)
+else:
+    print("Not enough elements to remove first and last.")
