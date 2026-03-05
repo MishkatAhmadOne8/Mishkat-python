@@ -1,0 +1,4 @@
+def check_range(num, start, end):
+    return start <= num <= end
+
+print(check_range(5, 1, 10))
