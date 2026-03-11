@@ -1,0 +1,8 @@
+s = input("Source file: ")
+d = input("Destination file: ")
+
+for line in open(s):
+    if not line.strip().startswith("#"):
+        open(d, "a").write(line)
+
+print("File copied without comments")
