@@ -1,0 +1,31 @@
+import pandas as pd
+
+# Create DataFrame
+data = {
+    'State': ['State1', 'State2', 'State3', 'State4', 'State5'],
+    'Area': [100000, 150000, 80000, 120000, 90000],   # in sq km
+    'Population': [5000000, 7000000, 3000000, 9000000, 4000000]
+}
+
+df = pd.DataFrame(data)
+
+# a) Complete information
+print("\nComplete State Data:\n")
+print(df)
+
+# b) State with largest area
+largest_area = df[df['Area'] == df['Area'].max()]
+print("\nState with largest area:\n", largest_area['State'])
+
+# c) State with largest population
+largest_pop = df[df['Population'] == df['Population'].max()]
+print("\nState with largest population:\n", largest_pop['State'])
+
+# d) Population density calculation
+df['Density'] = df['Population'] / df['Area']
+print("\nPopulation Density:\n")
+print(df[['State', 'Density']])
+
+# e) State with highest population density
+highest_density = df[df['Density'] == df['Density'].max()]
+print("\nState with highest population density:\n", highest_density['State'])
