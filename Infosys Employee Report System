@@ -1,0 +1,27 @@
+import pandas as pd
+
+# Load the excel file
+# Note: Ensure 'employee.xlsx' is in the same folder as your script
+try:
+    df_emp = pd.read_excel('employee.xlsx')
+
+    # a) Print the list of employees working for "Automotive" domain
+    # We assume the column name is 'Department'
+    automotive_emps = df_emp[df_emp['Department'] == 'Automotive']
+    print("--- Employees in Automotive Domain ---")
+    print(automotive_emps if not automotive_emps.empty else "No employees found.")
+
+    # b) Print details of an employee with ID given by user
+    emp_id = int(input("\nEnter Employee ID to search: "))
+    search_result = df_emp[df_emp['Employee ID'] == emp_id]
+    print(f"--- Details for ID {emp_id} ---")
+    print(search_result if not search_result.empty else "Employee ID not found.")
+
+    # d) Print the list of all the Developers of Infosys
+    # We assume the column name is 'Designation'
+    developers = df_emp[df_emp['Designation'] == 'Developer']
+    print("\n--- List of Developers ---")
+    print(developers if not developers.empty else "No Developers found.")
+
+except FileNotFoundError:
+    print("Error: The file 'employee.xlsx' was not found.")
